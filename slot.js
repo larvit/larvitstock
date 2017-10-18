@@ -2,6 +2,7 @@
 
 const	EventEmitter	= require('events').EventEmitter,
 	eventEmitter	= new EventEmitter(),
+	uuidValidate	=	require('uuid-validate'),
 	topLogPrefix	= 'larvitstock: Slots.js: ',
 	dataWriter	= require(__dirname + '/dataWriter.js'),
 	uuidLib	= require('uuid'),
@@ -45,7 +46,7 @@ function ready(cb) {
 
 function Slot(options) {
 	return this.init(options);
-}
+};
 
 Slot.prototype.init = function (options) {
 	const	logPrefix	= topLogPrefix + 'Slot.prototype.init() - ';
@@ -68,6 +69,18 @@ Slot.prototype.init = function (options) {
 
 	this.uuid	= options.uuid;
 
+	if (options.warehouseUuid === undefined || ! uuidValidate(options.warehouseUuid)) {
+		throw new Error('Invalid warehouse uuid');
+	} else {
+		this.warehouseUuid	= options.warehouseUuid;
+	}
+
+	if (options.name === undefined || typeof options.name !== 'string') {
+		throw new Error('Invalid slot name');
+	} else {
+		this.name	= options.name;
+	}
+
 	if (options.created !== undefined) {
 		this.created	= options.created;
 	} else {
@@ -78,10 +91,44 @@ Slot.prototype.init = function (options) {
 		throw new Error('created is not an instance of Date');
 	}
 
-	this.fields	= options.fields;
 	this.ready	= ready; // To expose to the outside world
-
-	if (this.fields === undefined) {
-		this.fields = {};
-	}
 };
+
+Slot.prototype.loadFromDb = function (cb) {
+	cb();
+};
+
+Slot.prototype.save = function (cb) {
+	const	tasks	= [],
+		that	= this;
+
+	// Await database readiness
+	tasks.push(ready);
+
+	tasks.push(function (cb) {
+		const	options	= {'exchange': dataWriter.exchangeName},
+			message	= {};
+
+		message.action	= 'writeSlot';
+		message.params	= {};
+
+		message.params.uuid	= that.uuid;
+		message.params.warehouseUuid	= that.warehouseUuid;
+		message.params.name	= that.name;
+		message.params.created	= that.created;
+
+		intercom.send(message, options, function (err, msgUuid) {
+			if (err) return cb(err);
+
+			dataWriter.emitter.once(msgUuid, cb);
+		});
+	});
+
+	tasks.push(function (cb) {
+		that.loadFromDb(cb);
+	});
+
+	async.series(tasks, cb);
+};
+
+exports = module.exports = Slot;

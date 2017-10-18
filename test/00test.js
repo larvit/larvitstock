@@ -3,7 +3,7 @@
 const	//uuidValidate	= require('uuid-validate'),
 	Intercom	= require('larvitamintercom'),
 	stockLib	= require(__dirname + '/../index.js'),
-	//uuidLib	= require('uuid'),
+	uuidLib	= require('uuid'),
 	//assert	= require('assert'),
 	lUtils	= require('larvitutils'),
 	async	= require('async'),
@@ -14,13 +14,13 @@ const	//uuidValidate	= require('uuid-validate'),
 stockLib.dataWriter.mode = 'master';
 
 // Set up winston
-log.remove(log.transports.Console);
-/**/log.add(log.transports.Console, {
-	'level':	'warn',
-	'colorize':	true,
-	'timestamp':	true,
-	'json':	false
-});/**/
+//log.remove(log.transports.Console);
+///**/log.add(log.transports.Console, {
+//	'level':	'warn',
+//	'colorize':	true,
+//	'timestamp':	true,
+//	'json':	false
+//});/**/
 
 
 before(function (done) {
@@ -83,6 +83,20 @@ before(function (done) {
 	});
 
 	async.series(tasks, done);
+});
+
+describe('Slot', function () {
+	let	slotOptions = {
+		uuid: uuidLib.v1(),
+		name: 'A001',
+		warehouseUuid: uuidLib.v1()
+	};
+
+	it('should create a and save a slot', function (done) {
+		const slot = new stockLib.Slot(slotOptions);
+		console.log(slot);
+		done();
+	});
 });
 
 

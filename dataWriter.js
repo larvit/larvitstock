@@ -4,7 +4,6 @@ const	EventEmitter	= require('events').EventEmitter,
 	eventEmitter	= new EventEmitter(),
 	topLogPrefix	= 'larvitstock: dataWriter.js: ',
 	DbMigration	= require('larvitdbmigration'),
-	uuidLib	= require('uuid'),
 	lUtils	= require('larvitutils'),
 	amsync	= require('larvitamsync'),
 	async	= require('async'),
@@ -261,274 +260,88 @@ function runDumpServer(cb) {
 //	new amsync.SyncServer(options, cb);
 //}
 
-//function writeOrder(params, deliveryTag, msgUuid, cb) {
-//	const	orderFields	= params.fields,
-//		logPrefix	= topLogPrefix + 'writeOrder() - ',
-//		orderRows	= params.rows,
-//		orderUuid	= params.uuid,
-//		orderUuidBuf	= lUtils.uuidToBuffer(orderUuid),
-//		created	= params.created,
-//		tasks	= [];
-//
-//	let	rowFieldUuidsByName,
-//		fieldUuidsByName,
-//		dbCon;
-//
-//	if (typeof cb !== 'function') {
-//		cb = function () {};
-//	}
-//
-//	if (lUtils.formatUuid(orderUuid) === false || orderUuidBuf === false) {
-//		const err = new Error('Invalid orderUuid: "' + orderUuid + '"');
-//		log.error(logPrefix + err.message);
-//		exports.emitter.emit(orderUuid, err);
-//		return;
-//	}
-//
-//	// Get all field ids
-//	tasks.push(function (cb) {
-//		helpers.getOrderFieldUuids(Object.keys(orderFields), function (err, result) {
-//			fieldUuidsByName = result;
-//			cb(err);
-//		});
-//	});
-//
-//	// Get all row field uuids
-//	tasks.push(function (cb) {
-//		const	rowFieldNames	= [];
-//
-//		for (let i = 0; orderRows[i] !== undefined; i ++) {
-//			const	row	= orderRows[i];
-//
-//			for (const rowFieldName of Object.keys(row)) {
-//				if (rowFieldNames.indexOf(rowFieldName) === - 1) {
-//					rowFieldNames.push(rowFieldName);
-//				}
-//			}
-//		}
-//
-//		helpers.getRowFieldUuids(rowFieldNames, function (err, result) {
-//			rowFieldUuidsByName = result;
-//			cb(err);
-//		});
-//	});
-//
-//	// Get a database connection
-//	tasks.push(function (cb) {
-//		db.getConnection(function(err, result) {
-//			dbCon	= result;
-//			cb(err);
-//		});
-//	});
-//
-//	// Make sure the base order row exists
-//	tasks.push(function (cb) {
-//		const	sql	= 'INSERT IGNORE INTO orders (uuid, created) VALUES(?,?)';
-//
-//		dbCon.query(sql, [orderUuidBuf, created], cb);
-//	});
-//
-//	// Clean out old field data
-//	tasks.push(function (cb) {
-//		dbCon.query('DELETE FROM orders_orders_fields WHERE orderUuid = ?', [orderUuidBuf], cb);
-//	});
-//
-//	// Clean out old row field data
-//	tasks.push(function (cb) {
-//		const	dbFields	= [orderUuidBuf],
-//			sql	= 'DELETE FROM orders_rows_fields WHERE rowUuid IN (SELECT rowUuid FROM orders_rows WHERE orderUuid = ?)';
-//
-//		dbCon.query(sql, dbFields, cb);
-//	});
-//
-//	// Clean out old rows
-//	tasks.push(function (cb) {
-//		const	dbFields	= [orderUuidBuf],
-//			sql	= 'DELETE FROM orders_rows WHERE orderUuid = ?';
-//
-//		dbCon.query(sql, dbFields, cb);
-//	});
-//
-//	// By now we have a clean database, lets insert stuff!
-//
-//	// Insert fields
-//	tasks.push(function (cb) {
-//		const	dbFields	= [];
-//
-//		let	sql	= 'INSERT INTO orders_orders_fields (orderUuid, fieldUuid, fieldValue) VALUES';
-//
-//		for (const fieldName of Object.keys(orderFields)) {
-//			if ( ! (orderFields[fieldName] instanceof Array)) {
-//				orderFields[fieldName] = [orderFields[fieldName]];
-//			}
-//
-//			for (let i = 0; orderFields[fieldName][i] !== undefined; i ++) {
-//				const	fieldValue	= orderFields[fieldName][i];
-//				sql += '(?,?,?),';
-//				dbFields.push(orderUuidBuf);
-//				dbFields.push(fieldUuidsByName[fieldName]);
-//				dbFields.push(fieldValue);
-//			}
-//		}
-//
-//		if (dbFields.length === 0) {
-//			cb();
-//			return;
-//		}
-//
-//		sql = sql.substring(0, sql.length - 1) + ';';
-//		dbCon.query(sql, dbFields, cb);
-//	});
-//
-//	// Insert rows
-//	tasks.push(function (cb) {
-//		const	dbFields	= [];
-//
-//		let	sql	= 'INSERT INTO orders_rows (rowUuid, orderUuid) VALUES';
-//
-//		for (let i = 0; orderRows[i] !== undefined; i ++) {
-//			const row = orderRows[i];
-//
-//			// Make sure all rows got an uuid
-//			if (row.uuid === undefined) {
-//				row.uuid = uuidLib.v4();
-//			}
-//
-//			sql += '(?,?),';
-//			dbFields.push(lUtils.uuidToBuffer(row.uuid));
-//			dbFields.push(orderUuidBuf);
-//		}
-//
-//		if (dbFields.length === 0) return cb();
-//
-//		sql = sql.substring(0, sql.length - 1);
-//		dbCon.query(sql, dbFields, cb);
-//	});
-//
-//	// Insert row fields
-//	tasks.push(function (cb) {
-//		const	dbFields	= [];
-//
-//		let	sql	= 'INSERT INTO orders_rows_fields (rowUuid, rowFieldUuid, rowIntValue, rowStrValue) VALUES';
-//
-//		for (let i = 0; orderRows[i] !== undefined; i ++) {
-//			const	row	= orderRows[i];
-//
-//			for (const rowFieldName of Object.keys(row)) {
-//				const	rowUuidBuff	= lUtils.uuidToBuffer(row.uuid);
-//
-//				if (rowFieldName === 'uuid') continue;
-//
-//				if ( ! (row[rowFieldName] instanceof Array)) {
-//					row[rowFieldName] = [row[rowFieldName]];
-//				}
-//
-//				for (let i = 0; row[rowFieldName][i] !== undefined; i ++) {
-//					const rowFieldValue = row[rowFieldName][i];
-//
-//					sql += '(?,?,?,?),';
-//					dbFields.push(rowUuidBuff);
-//					dbFields.push(rowFieldUuidsByName[rowFieldName]);
-//
-//					if (typeof rowFieldValue === 'number' && (rowFieldValue % 1) === 0) {
-//						dbFields.push(rowFieldValue);
-//						dbFields.push(null);
-//					} else {
-//						dbFields.push(null);
-//						dbFields.push(rowFieldValue);
-//					}
-//				}
-//			}
-//		}
-//
-//		if (dbFields.length === 0) return cb();
-//
-//		sql = sql.substring(0, sql.length - 1) + ';';
-//
-//		dbCon.query(sql, dbFields, function (err) {
-//			if (err) {
-//				try {
-//					log.error(logPrefix + 'Full order params: ' + JSON.stringify(params));
-//				} catch (err) {
-//					log.error(logPrefix + 'Could not log proder params: ' + err.message);
-//				}
-//			}
-//
-//			cb(err);
-//		});
-//	});
-//
-//	async.series(tasks, function (err) {
-//		if (dbCon) {
-//			if (err) {
-//				return dbCon.rollback(function (rollErr) {
-//					if (rollErr) {
-//						log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
-//					}
-//					exports.emitter.emit(msgUuid, err);
-//					return cb(err);
-//				});
-//			}
-//
-//			dbCon.commit(function (err) {
-//				if (err) {
-//					return dbCon.rollback(function (rollErr) {
-//						if (rollErr) {
-//							log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
-//						}
-//						exports.emitter.emit(msgUuid, err);
-//						return cb(err);
-//					});
-//				}
-//
-//				exports.emitter.emit(msgUuid, null);
-//				return cb();
-//			});
-//
-//			return;
-//		}
-//
-//		exports.emitter.emit(msgUuid, err);
-//		return cb(err);
-//	});
-//}
+function writeSlot(params, deliveryTag, msgUuid, cb) {
+	const	warehouseUuid	= params.warehouseUuid,
+		warehouseUuidBuf	= lUtils.uuidToBuffer(warehouseUuid),
+		logPrefix	= topLogPrefix + 'writeSlot() - ',
+		slotUuid	= params.uuid,
+		slotUuidBuf	= lUtils.uuidToBuffer(SlotUuid),
+		created	= params.created,
+		tasks	= [];
 
-//function writeOrderField(params, deliveryTag, msgUuid) {
-//	const	uuid	= params.uuid,
-//		name	= params.name;
-//
-//	db.query('INSERT IGNORE INTO orders_orderFields (uuid, name) VALUES(?,?)', [uuid, name], function (err) {
-//		if (err) {
-//			exports.emitter.emit(msgUuid, err);
-//			return;
-//		}
-//
-//		helpers.loadOrderFieldsToCache(function (err) {
-//			exports.emitter.emit(msgUuid, err);
-//		});
-//	});
-//}
+	let	dbCon;
 
-//function writeRowField(params, deliveryTag, msgUuid) {
-//	const	uuid	= params.uuid,
-//		name	= params.name;
-//
-//	db.query('INSERT IGNORE INTO orders_rowFields (uuid, name) VALUES(?,?)', [uuid, name], function (err) {
-//		if (err) {
-//			exports.emitter.emit(msgUuid, err);
-//			return;
-//		}
-//
-//		helpers.loadRowFieldsToCache(function (err) {
-//			exports.emitter.emit(msgUuid, err);
-//		});
-//	});
-//}
+	if (typeof cb !== 'function') {
+		cb = function () {};
+	}
+
+	if (lUtils.formatUuid(slotUuid) === false || slotUuidBuf === false) {
+		const err = new Error('Invalid slotrUuid: "' + slotUuid + '"');
+		log.error(logPrefix + err.message);
+		exports.emitter.emit(slotUuid, err);
+		return;
+	}
+
+	if (lUtils.formatUuid(warehouseUuid) === false || warehouseUuidBuf === false) {
+		const err = new Error('Invalid slotrUuid: "' + warehouseUuid + '"');
+		log.error(logPrefix + err.message);
+		exports.emitter.emit(warehouseUuid, err);
+		return;
+	}
+
+	// Get a database connection
+	tasks.push(function (cb) {
+		db.getConnection(function(err, result) {
+			dbCon	= result;
+			cb(err);
+		});
+	});
+
+	// Make sure the base order row exists
+	tasks.push(function (cb) {
+		const	sql	= 'INSERT IGNORE INTO slots (uuid, warehouseUuid, created) VALUES(?,?,?)';
+
+		dbCon.query(sql, [orderUuidBuf, warehouseUuidBuf, created], cb);
+	});
+
+
+	async.series(tasks, function (err) {
+		if (dbCon) {
+			if (err) {
+				return dbCon.rollback(function (rollErr) {
+					if (rollErr) {
+						log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+					}
+					exports.emitter.emit(msgUuid, err);
+					return cb(err);
+				});
+			}
+
+			dbCon.commit(function (err) {
+				if (err) {
+					return dbCon.rollback(function (rollErr) {
+						if (rollErr) {
+							log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+						}
+						exports.emitter.emit(msgUuid, err);
+						return cb(err);
+					});
+				}
+
+				exports.emitter.emit(msgUuid, null);
+				return cb();
+			});
+
+			return;
+		}
+
+		exports.emitter.emit(msgUuid, err);
+		return cb(err);
+	});
+}
 
 exports.emitter	= new EventEmitter();
 exports.exchangeName	= 'larvitstock';
 exports.ready	= ready;
 //exports.rmOrder	= rmOrder;
-//exports.writeOrder	= writeOrder;
-//exports.writeOrderField	= writeOrderField;
-//exports.writeRowField	= writeRowField;
+exports.writeSlot	= writeSlot;
