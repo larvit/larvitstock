@@ -95,7 +95,31 @@ Slot.prototype.init = function (options) {
 };
 
 Slot.prototype.loadFromDb = function (cb) {
-	cb();
+	const	logPrefix	= topLogPrefix + 'Slot.prototype.loadFromDb() - uuid: "' + this.uuid + '" - ',
+		tasks	= [],
+		that	= this;
+
+	// Await database readiness
+	tasks.push(ready);
+
+	// Load slot from database
+	tasks.push(function (cb) {
+		log.debug(logPrefix + 'Getting slot data');
+		db.query('SELECT * FROM slots WHERE uuid = ?', [lUtils.uuidToBuffer(that.uuid)], function (err, rows) {
+			if (err) return cb(err);
+
+			if (rows.length) {
+				that.uuid	= lUtils.formatUuid(rows[0].uuid);
+				that.name	= rows[0].name;
+				that.created	= rows[0].created;
+				that.warehouseUuid	= lUtils.formatUuid(rows[0].warehouseUuid);
+			}
+
+			cb();
+		});
+	});
+
+	async.series(tasks, cb);
 };
 
 Slot.prototype.save = function (cb) {

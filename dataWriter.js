@@ -265,9 +265,10 @@ function writeSlot(params, deliveryTag, msgUuid, cb) {
 		warehouseUuidBuf	= lUtils.uuidToBuffer(warehouseUuid),
 		logPrefix	= topLogPrefix + 'writeSlot() - ',
 		slotUuid	= params.uuid,
-		slotUuidBuf	= lUtils.uuidToBuffer(SlotUuid),
+		slotUuidBuf	= lUtils.uuidToBuffer(slotUuid),
 		created	= params.created,
-		tasks	= [];
+		tasks	= [],
+		name	=	params.name;
 
 	let	dbCon;
 
@@ -299,9 +300,9 @@ function writeSlot(params, deliveryTag, msgUuid, cb) {
 
 	// Make sure the base order row exists
 	tasks.push(function (cb) {
-		const	sql	= 'INSERT IGNORE INTO slots (uuid, warehouseUuid, created) VALUES(?,?,?)';
+		const	sql	= 'INSERT IGNORE INTO slots (uuid, warehouseUuid, name, created) VALUES(?,?,?,?)';
 
-		dbCon.query(sql, [orderUuidBuf, warehouseUuidBuf, created], cb);
+		dbCon.query(sql, [slotUuidBuf, warehouseUuidBuf, name, created], cb);
 	});
 
 

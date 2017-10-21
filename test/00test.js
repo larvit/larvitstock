@@ -4,7 +4,7 @@ const	//uuidValidate	= require('uuid-validate'),
 	Intercom	= require('larvitamintercom'),
 	stockLib	= require(__dirname + '/../index.js'),
 	uuidLib	= require('uuid'),
-	//assert	= require('assert'),
+	assert	= require('assert'),
 	lUtils	= require('larvitutils'),
 	async	= require('async'),
 	log	= require('winston'),
@@ -14,13 +14,13 @@ const	//uuidValidate	= require('uuid-validate'),
 stockLib.dataWriter.mode = 'master';
 
 // Set up winston
-//log.remove(log.transports.Console);
-///**/log.add(log.transports.Console, {
-//	'level':	'warn',
-//	'colorize':	true,
-//	'timestamp':	true,
-//	'json':	false
-//});/**/
+log.remove(log.transports.Console);
+/**/log.add(log.transports.Console, {
+	'level':	'warn',
+	'colorize':	true,
+	'timestamp':	true,
+	'json':	false
+});/**/
 
 
 before(function (done) {
@@ -93,9 +93,35 @@ describe('Slot', function () {
 	};
 
 	it('should create a and save a slot', function (done) {
-		const slot = new stockLib.Slot(slotOptions);
-		console.log(slot);
-		done();
+		const	tasks	= [],
+			slot	= new stockLib.Slot(slotOptions);
+
+		// Save slot
+		tasks.push(function (cb) {
+			slot.save(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		tasks.push(function (cb) {
+			slot.loadFromDb(function (err) {
+				if (err) throw err;
+
+				assert.deepEqual(slotOptions.uuid, slot.uuid);
+				assert.deepEqual(slotOptions.name, slot.name);
+				assert.deepEqual(slotOptions.warehouseUuid, slot.warehouseUuid);
+				assert.notDeepEqual(slot.created, undefined);
+				cb(err);
+			});
+		});
+
+		async.series(tasks, function(err) {
+			if (err) throw err;
+
+			done();
+		});
 	});
 });
 
