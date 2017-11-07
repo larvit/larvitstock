@@ -2,8 +2,7 @@
 
 const	EventEmitter	= require('events').EventEmitter,
 	eventEmitter	= new EventEmitter(),
-	uuidValidate	=	require('uuid-validate'),
-	topLogPrefix	= 'larvitstock: Slots.js: ',
+	topLogPrefix	= 'larvitstock: Warehouse.js: ',
 	dataWriter	= require(__dirname + '/dataWriter.js'),
 	uuidLib	= require('uuid'),
 	lUtils	= require('larvitutils'),
@@ -44,12 +43,12 @@ function ready(cb) {
 	});
 }
 
-function Slot(options) {
+function Warehouse(options) {
 	return this.init(options);
 };
 
-Slot.prototype.init = function (options) {
-	const	logPrefix	= topLogPrefix + 'Slot.prototype.init() - ';
+Warehouse.prototype.init = function (options) {
+	const	logPrefix	= topLogPrefix + 'Warehouse.prototype.init() - ';
 
 	if (options === undefined) {
 		options = {};
@@ -62,14 +61,13 @@ Slot.prototype.init = function (options) {
 
 	if (options.uuid === undefined) {
 		options.uuid	= uuidLib.v1();
-		log.verbose(logPrefix + 'New Slot - Creating Slot with uuid: ' + options.uuid);
+		log.verbose(logPrefix + 'New Warehouse - Creating Warehouse with uuid: ' + options.uuid);
 	} else {
-		log.verbose(logPrefix + 'Instanciating slot with uuid: ' + options.uuid);
+		log.verbose(logPrefix + 'Instanciating warehouse with uuid: ' + options.uuid);
 	}
 
 	this.uuid	= options.uuid;
 
-	if (options.warehouseUuid	!== undefined)	this.warehouseUuid	= options.warehouseUuid;
 	if (options.name 	!== undefined)	this.name	= options.name;
 	if (options.created 	!== undefined) 	this.created	= options.created;
 
@@ -77,25 +75,24 @@ Slot.prototype.init = function (options) {
 	this.ready	= ready; // To expose to the outside world
 };
 
-Slot.prototype.loadFromDb = function (cb) {
-	const	logPrefix	= topLogPrefix + 'Slot.prototype.loadFromDb() - uuid: "' + this.uuid + '" - ',
+Warehouse.prototype.loadFromDb = function (cb) {
+	const	logPrefix	= topLogPrefix + 'Warehouse.prototype.loadFromDb() - uuid: "' + this.uuid + '" - ',
 		tasks	= [],
 		that	= this;
 
 	// Await database readiness
 	tasks.push(ready);
 
-	// Load slot from database
+	// Load Warehouse from database
 	tasks.push(function (cb) {
-		log.debug(logPrefix + 'Getting slot data');
-		db.query('SELECT * FROM slots WHERE uuid = ?', [lUtils.uuidToBuffer(that.uuid)], function (err, rows) {
+		log.debug(logPrefix + 'Getting warehouse data');
+		db.query('SELECT * FROM warehouses WHERE uuid = ?', [lUtils.uuidToBuffer(that.uuid)], function (err, rows) {
 			if (err) return cb(err);
 
 			if (rows.length) {
 				that.uuid	= lUtils.formatUuid(rows[0].uuid);
 				that.name	= rows[0].name;
 				that.created	= rows[0].created;
-				that.warehouseUuid	= lUtils.formatUuid(rows[0].warehouseUuid);
 			}
 
 			cb();
@@ -105,13 +102,12 @@ Slot.prototype.loadFromDb = function (cb) {
 	async.series(tasks, cb);
 };
 
-Slot.prototype.save = function (cb) {
+Warehouse.prototype.save = function (cb) {
 	const	tasks	= [],
 		that	= this;
 
 	if (that.created 	=== undefined) 	this.created	= new Date();
-	if (that.warehouseUuid	=== undefined || ! uuidValidate(that.warehouseUuid))	throw new Error('Invalid warehouse uuid');
-	if (that.name 	=== undefined || typeof that.name !== 'string')	throw new Error('Invalid slot name');
+	if (that.name 	=== undefined || typeof that.name !== 'string')	throw new Error('Invalid warehouse name');
 	if ( ! (this.created instanceof Date))		throw new Error('created is not an instance of Date');
 
 	// Await database readiness
@@ -121,7 +117,7 @@ Slot.prototype.save = function (cb) {
 		const	options	= {'exchange': dataWriter.exchangeName},
 			message	= {};
 
-		message.action	= 'writeSlot';
+		message.action	= 'writeWarehouse';
 		message.params	= {};
 
 		message.params.uuid	= that.uuid;
@@ -143,12 +139,12 @@ Slot.prototype.save = function (cb) {
 	async.series(tasks, cb);
 };
 
-Slot.prototype.rm = function (cb) {
+Warehouse.prototype.rm = function (cb) {
 	const	that	= this,
 		options	= {'exchange': dataWriter.exchangeName},
 		message	= {};
 
-	message.action	= 'rmSlot';
+	message.action	= 'rmWarehouse';
 	message.params	= {};
 	message.params.uuid	= that.uuid;
 
@@ -159,4 +155,4 @@ Slot.prototype.rm = function (cb) {
 	});
 
 };
-exports = module.exports = Slot;
+exports = module.exports = Warehouse;

@@ -178,87 +178,100 @@ function ready(retries, cb) {
 	});
 }
 
-//function rmOrder(params, deliveryTag, msgUuid) {
-//	const	orderUuid	= params.uuid,
-//		orderUuidBuf	= lUtils.uuidToBuffer(orderUuid),
-//		tasks	= [];
-//
-//	// Delete field data
-//	tasks.push(function (cb) {
-//		db.query('DELETE FROM orders_orders_fields WHERE orderUuid = ?', [orderUuidBuf], cb);
-//	});
-//
-//	// Delete row field data
-//	tasks.push(function (cb) {
-//		const	dbFields	= [orderUuidBuf],
-//			sql	= 'DELETE FROM orders_rows_fields WHERE rowUuid IN (SELECT rowUuid FROM orders_rows WHERE orderUuid = ?)';
-//
-//		db.query(sql, dbFields, cb);
-//	});
-//
-//	// Delete rows
-//	tasks.push(function (cb) {
-//		const	dbFields	= [orderUuidBuf],
-//			sql	= 'DELETE FROM orders_rows WHERE orderUuid = ?';
-//
-//		db.query(sql, dbFields, cb);
-//	});
-//
-//	// Delete order
-//	tasks.push(function (cb) {
-//		const	dbFields	= [orderUuidBuf],
-//			sql	= 'DELETE FROM orders WHERE uuid = ?';
-//
-//		db.query(sql, dbFields, cb);
-//	});
-//
-//	async.series(tasks, function (err) {
-//		exports.emitter.emit(msgUuid, err);
-//	});
-//}
-
 function runDumpServer(cb) {
 	cb(null);
 }
 
-//function runDumpServer(cb) {
-//	const	options	= {'exchange': exports.exchangeName + '_dataDump'},
-//		args	= [];
-//
-//	if (db.conf.host) {
-//		args.push('-h');
-//		args.push(db.conf.host);
-//	}
-//
-//	args.push('-u');
-//	args.push(db.conf.user);
-//
-//	if (db.conf.password) {
-//		args.push('-p' + db.conf.password);
-//	}
-//
-//	args.push('--single-transaction');
-//	args.push('--hex-blob');
-//	args.push(db.conf.database);
-//
-//	// Tables
-//	args.push('orders');
-//	args.push('orders_db_version');
-//	args.push('orders_orderFields');
-//	args.push('orders_orders_fields');
-//	args.push('orders_rowFields');
-//	args.push('orders_rows');
-//	args.push('orders_rows_fields');
-//
-//	options.dataDumpCmd = {
-//		'command':	'mysqldump',
-//		'args':	args
-//	};
-//
-//	options['Content-Type'] = 'application/sql';
-//
-//	new amsync.SyncServer(options, cb);
-//}
+function writeWarehouse(params, deliveryTag, msgUuid, cb) {
+	const	logPrefix	= topLogPrefix + 'writeWarehouse() - ',
+		warehouseUuid	= params.uuid,
+		warehouseUuidBuf	= lUtils.uuidToBuffer(warehouseUuid),
+		created	= params.created,
+		tasks	= [],
+		name	=	params.name;
+
+	let	dbCon;
+
+	if (typeof cb !== 'function') {
+		cb = function () {};
+	}
+
+	if (lUtils.formatUuid(warehouseUuid) === false || warehouseUuidBuf === false) {
+		const err = new Error('Invalid warehouseUuid: "' + warehouseUuid + '"');
+		log.error(logPrefix + err.message);
+		exports.emitter.emit(warehouseUuid, err);
+		return;
+	}
+
+	// Get a database connection
+	tasks.push(function (cb) {
+		db.getConnection(function(err, result) {
+			dbCon	= result;
+			cb(err);
+		});
+	});
+
+	// Write warehouse
+	tasks.push(function (cb) {
+		const	sql	= 'INSERT IGNORE INTO warehouses (uuid, name, created) VALUES(?,?,?)';
+
+		dbCon.query(sql, [warehouseUuidBuf, name, created], cb);
+	});
+
+
+	async.series(tasks, function (err) {
+		if (dbCon) {
+			if (err) {
+				return dbCon.rollback(function (rollErr) {
+					if (rollErr) {
+						log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+					}
+					exports.emitter.emit(msgUuid, err);
+					return cb(err);
+				});
+			}
+
+			dbCon.commit(function (err) {
+				if (err) {
+					return dbCon.rollback(function (rollErr) {
+						if (rollErr) {
+							log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+						}
+						exports.emitter.emit(msgUuid, err);
+						return cb(err);
+					});
+				}
+
+				exports.emitter.emit(msgUuid, null);
+				return cb();
+			});
+
+			return;
+		}
+
+		exports.emitter.emit(msgUuid, err);
+		return cb(err);
+	});
+}
+
+function rmWarehouse(params, deliveryTag, msgUuid) {
+	const	warehouseUuid	= params.uuid,
+		warehouseUuidBuf	= lUtils.uuidToBuffer(warehouseUuid),
+		tasks	= [];
+
+
+	// Delete warehouse
+	tasks.push(function (cb) {
+		const	dbFields	= [warehouseUuidBuf],
+			sql	= 'DELETE FROM warehouses WHERE uuid = ?';
+
+		db.query(sql, dbFields, cb);
+	});
+
+	async.series(tasks, function (err) {
+		exports.emitter.emit(msgUuid, err);
+	});
+}
 
 function writeSlot(params, deliveryTag, msgUuid, cb) {
 	const	warehouseUuid	= params.warehouseUuid,
@@ -341,8 +354,29 @@ function writeSlot(params, deliveryTag, msgUuid, cb) {
 	});
 }
 
+function rmSlot(params, deliveryTag, msgUuid) {
+	const	slotUuid	= params.uuid,
+		slotUuidBuf	= lUtils.uuidToBuffer(slotUuid),
+		tasks	= [];
+
+
+	// Delete slot
+	tasks.push(function (cb) {
+		const	dbFields	= [slotUuidBuf],
+			sql	= 'DELETE FROM slots WHERE uuid = ?';
+
+		db.query(sql, dbFields, cb);
+	});
+
+	async.series(tasks, function (err) {
+		exports.emitter.emit(msgUuid, err);
+	});
+}
+
 exports.emitter	= new EventEmitter();
 exports.exchangeName	= 'larvitstock';
 exports.ready	= ready;
-//exports.rmOrder	= rmOrder;
+exports.writeWarehouse	= writeWarehouse;
+exports.rmWarehouse	= rmWarehouse;
 exports.writeSlot	= writeSlot;
+exports.rmSlot	= rmSlot;
