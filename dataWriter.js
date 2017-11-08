@@ -373,6 +373,106 @@ function rmSlot(params, deliveryTag, msgUuid) {
 	});
 }
 
+function writeItem(params, deliveryTag, msgUuid, cb) {
+	const	slotUuid	= params.slotUuid,
+		slotUuidBuf	= lUtils.uuidToBuffer(slotUuid),
+		logPrefix	= topLogPrefix + 'writeItem() - ',
+		itemUuid	= params.uuid,
+		itemUuidBuf	= lUtils.uuidToBuffer(itemUuid),
+		created	= params.created,
+		tasks	= [],
+		article	=	params.article;
+
+	let	dbCon;
+
+	if (typeof cb !== 'function') {
+		cb = function () {};
+	}
+
+	if (lUtils.formatUuid(itemUuid) === false || itemUuidBuf === false) {
+		const err = new Error('Invalid itemUuid: "' + itemUuid + '"');
+		log.error(logPrefix + err.message);
+		exports.emitter.emit(itemUuid, err);
+		return;
+	}
+
+	if (lUtils.formatUuid(slotUuid) === false || slotUuidBuf === false) {
+		const err = new Error('Invalid itemUuid: "' + slotUuid + '"');
+		log.error(logPrefix + err.message);
+		exports.emitter.emit(slotUuid, err);
+		return;
+	}
+
+	// Get a database connection
+	tasks.push(function (cb) {
+		db.getConnection(function(err, result) {
+			dbCon	= result;
+			cb(err);
+		});
+	});
+
+	// Make sure the base order row exists
+	tasks.push(function (cb) {
+		const	sql	= 'INSERT IGNORE INTO items (uuid, article, slotUuid, created) VALUES(?,?,?,?)';
+
+		dbCon.query(sql, [itemUuidBuf, article, slotUuidBuf, created], cb);
+	});
+
+
+	async.series(tasks, function (err) {
+		if (dbCon) {
+			if (err) {
+				return dbCon.rollback(function (rollErr) {
+					if (rollErr) {
+						log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+					}
+					exports.emitter.emit(msgUuid, err);
+					return cb(err);
+				});
+			}
+
+			dbCon.commit(function (err) {
+				if (err) {
+					return dbCon.rollback(function (rollErr) {
+						if (rollErr) {
+							log.error(logPrefix + 'Could not rollback: ' + rollErr.message);
+						}
+						exports.emitter.emit(msgUuid, err);
+						return cb(err);
+					});
+				}
+
+				exports.emitter.emit(msgUuid, null);
+				return cb();
+			});
+
+			return;
+		}
+
+		exports.emitter.emit(msgUuid, err);
+		return cb(err);
+	});
+}
+
+function rmItem(params, deliveryTag, msgUuid) {
+	const	itemUuid	= params.uuid,
+		itemUuidBuf	= lUtils.uuidToBuffer(itemUuid),
+		tasks	= [];
+
+
+	// Delete slot
+	tasks.push(function (cb) {
+		const	dbFields	= [itemUuidBuf],
+			sql	= 'DELETE FROM items WHERE uuid = ?';
+
+		db.query(sql, dbFields, cb);
+	});
+
+	async.series(tasks, function (err) {
+		exports.emitter.emit(msgUuid, err);
+	});
+}
+
 exports.emitter	= new EventEmitter();
 exports.exchangeName	= 'larvitstock';
 exports.ready	= ready;
@@ -380,3 +480,5 @@ exports.writeWarehouse	= writeWarehouse;
 exports.rmWarehouse	= rmWarehouse;
 exports.writeSlot	= writeSlot;
 exports.rmSlot	= rmSlot;
+exports.writeItem	= writeItem;
+exports.rmItem	= rmItem;

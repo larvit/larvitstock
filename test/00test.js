@@ -85,7 +85,7 @@ before(function (done) {
 	async.series(tasks, done);
 });
 
-describe('Warehouse', function () {
+describe('Warehouses', function () {
 	let	warehouseOptions = {
 		uuid: uuidLib.v1(),
 		name: 'Cellar'
@@ -123,7 +123,7 @@ describe('Warehouse', function () {
 		});
 	});
 
-	it('should remove privous created warehouse', function (done) {
+	it('should remove previous created warehouse', function (done) {
 		const	tasks	= [];
 
 		// Remove warehouse
@@ -246,7 +246,7 @@ describe('Warehouse', function () {
 	});
 });
 
-describe('Slot', function () {
+describe('Slots', function () {
 	let	testWarehouse,
 		slotOptions = {
 			uuid: uuidLib.v1(),
@@ -299,7 +299,7 @@ describe('Slot', function () {
 		});
 	});
 
-	it('should remove privous created slot', function (done) {
+	it('should remove previous created slot', function (done) {
 		const	tasks	= [];
 
 		// Remove slot
@@ -427,6 +427,190 @@ describe('Slot', function () {
 			done();
 		});
 	});
+});
+
+describe('Items', function () {
+	let	testSlot,
+		itemOptions = {
+			uuid: uuidLib.v1(),
+			article: '112121331-dsfsf',
+		};
+
+	before(function(done){
+		const slots = new stockLib.Slots();
+
+		slots.get(function (err, result) {
+			if (err) throw err;
+
+			testSlot	= result[Object.keys(result)[0]];
+			itemOptions.slotUuid	= testSlot.uuid;
+			done();
+		});
+	});
+
+	it('should create a and save an item', function (done) {
+		const	tasks	= [],
+			item	= new stockLib.Item(itemOptions);
+
+		// Save item
+		tasks.push(function (cb) {
+			item.save(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		tasks.push(function (cb) {
+			const item	= new stockLib.Item(itemOptions.uuid);
+
+			item.loadFromDb(function (err) {
+				if (err) throw err;
+
+				assert.deepEqual(itemOptions.uuid, item.uuid);
+				assert.deepEqual(itemOptions.article, item.article);
+				assert.deepEqual(itemOptions.slotUuid, item.slotUuid);
+				assert.notDeepEqual(item.created, undefined);
+				cb(err);
+			});
+		});
+
+		async.series(tasks, function(err) {
+			if (err) throw err;
+
+			done();
+		});
+	});
+
+	it('should remove previous created item', function (done) {
+		const	tasks	= [];
+
+		// Remove item
+		tasks.push(function (cb) {
+			const item	= new stockLib.Item(itemOptions.uuid);
+
+			item.rm(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		tasks.push(function (cb) {
+			const item	= new stockLib.Item(itemOptions.uuid);
+
+			item.loadFromDb(function (err) {
+				if (err) throw err;
+
+				assert.deepEqual(itemOptions.uuid, item.uuid);
+				assert.deepEqual(undefined, item.article);
+				assert.deepEqual(undefined, item.slotUuid);
+				assert.deepEqual(undefined, item.created);
+				cb(err);
+			});
+		});
+
+		async.series(tasks, function(err) {
+			if (err) throw err;
+
+			done();
+		});
+	});
+
+	it('should create and get several items', function (done) {
+		const	tasks	= [];
+
+		let	itemOptions1,
+			itemOptions2,
+			itemOptions3;
+
+
+		itemOptions1 = {
+			uuid: uuidLib.v1(),
+			article: '112233',
+			slotUuid: testSlot.uuid
+		};
+
+		itemOptions2 = {
+			uuid: uuidLib.v1(),
+			article: '223344',
+			slotUuid: testSlot.uuid
+		};
+
+		itemOptions3 = {
+			uuid: uuidLib.v1(),
+			article: '334455',
+			slotUuid: testSlot.uuid
+		};
+
+		// Save item1
+		tasks.push(function (cb) {
+			const item = new stockLib.Item(itemOptions1);
+
+			item.save(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		// Save item2
+		tasks.push(function (cb) {
+			const item = new stockLib.Item(itemOptions2);
+
+			item.save(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		// Save item3
+		tasks.push(function (cb) {
+			const item = new stockLib.Item(itemOptions3);
+
+			item.save(function (err) {
+				if (err) throw err;
+
+				cb(err);
+			});
+		});
+
+		// Get all 3 items
+		tasks.push(function (cb) {
+			const items = new stockLib.Items();
+
+			items.uuids	= [itemOptions1.uuid, itemOptions2.uuid, itemOptions3.uuid];
+
+			items.get(function (err, result) {
+				if (err) throw err;
+
+				assert.deepEqual(result[itemOptions1.uuid].uuid,	itemOptions1.uuid);
+				assert.deepEqual(result[itemOptions1.uuid].article,	itemOptions1.article);
+				assert.deepEqual(result[itemOptions1.uuid].slotUuid,	itemOptions1.slotUuid);
+				assert.notDeepEqual(result[itemOptions1.uuid].created,	undefined);
+
+				assert.deepEqual(result[itemOptions2.uuid].uuid,	itemOptions2.uuid);
+				assert.deepEqual(result[itemOptions2.uuid].article,	itemOptions2.article);
+				assert.deepEqual(result[itemOptions2.uuid].slotUuid,	itemOptions2.slotUuid);
+				assert.notDeepEqual(result[slotOptions2.uuid].created,	undefined);
+
+				assert.deepEqual(result[itemOptions3.uuid].uuid,	itemOptions3.uuid);
+				assert.deepEqual(result[itemOptions3.uuid].article,	itemOptions3.article);
+				assert.deepEqual(result[itemOptions3.uuid].slotUuid,	itemOptions3.slotUuid);
+				assert.notDeepEqual(result[itemOptions3.uuid].created,	undefined);
+
+				cb(err);
+			});
+		});
+
+		async.series(tasks, function(err) {
+			if (err) throw err;
+
+			done();
+		});
+	});
+
 });
 
 after(function (done) {
