@@ -11,8 +11,7 @@ const	EventEmitter	= require('events').EventEmitter,
 	db	= require('larvitdb');
 
 let	readyInProgress	= false,
-	isReady	= false,
-	intercom;
+	isReady	= false;
 
 function listenToQueue(retries, cb) {
 	const	logPrefix	= topLogPrefix + 'listenToQueue() - ',
@@ -47,28 +46,26 @@ function listenToQueue(retries, cb) {
 		return cb(err);
 	}
 
-	intercom	= require('larvitutils').instances.intercom;
-
-	if ( ! (intercom instanceof require('larvitamintercom')) && retries < 10) {
+	if ( ! (exports.intercom instanceof require('larvitamintercom')) && retries < 10) {
 		retries ++;
 		setTimeout(function () {
 			listenToQueue(retries, cb);
 		}, 50);
 		return;
-	} else if ( ! (intercom instanceof require('larvitamintercom'))) {
+	} else if ( ! (exports.intercom instanceof require('larvitamintercom'))) {
 		log.error(logPrefix + 'Intercom is not set!');
 		return;
 	}
 
 	log.info(logPrefix + 'listenMethod: ' + listenMethod);
 
-	intercom.ready(function (err) {
+	exports.intercom.ready(function (err) {
 		if (err) {
 			log.error(logPrefix + 'intercom.ready() err: ' + err.message);
 			return;
 		}
 
-		intercom[listenMethod](options, function (message, ack, deliveryTag) {
+		exports.intercom[listenMethod](options, function (message, ack, deliveryTag) {
 			exports.ready(function (err) {
 				ack(err); // Ack first, if something goes wrong we log it and handle it manually
 
@@ -120,15 +117,13 @@ function ready(retries, cb) {
 		return;
 	}
 
-	intercom	= require('larvitutils').instances.intercom;
-
-	if ( ! (intercom instanceof require('larvitamintercom')) && retries < 10) {
+	if ( ! (exports.intercom instanceof require('larvitamintercom')) && retries < 10) {
 		retries ++;
 		setTimeout(function () {
 			ready(retries, cb);
 		}, 50);
 		return;
-	} else if ( ! (intercom instanceof require('larvitamintercom'))) {
+	} else if ( ! (exports.intercom instanceof require('larvitamintercom'))) {
 		log.error(logPrefix + 'Intercom is not set!');
 		return;
 	}

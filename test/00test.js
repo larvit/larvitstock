@@ -5,13 +5,13 @@ const	//uuidValidate	= require('uuid-validate'),
 	stockLib	= require(__dirname + '/../index.js'),
 	uuidLib	= require('uuid'),
 	assert	= require('assert'),
-	lUtils	= require('larvitutils'),
 	async	= require('async'),
 	log	= require('winston'),
 	db	= require('larvitdb'),
 	fs	= require('fs');
 
-stockLib.dataWriter.mode = 'master';
+stockLib.dataWriter.intercom	= new Intercom('loopback interface');
+stockLib.dataWriter.mode	= 'master';
 
 // Set up winston
 log.remove(log.transports.Console);
@@ -29,7 +29,7 @@ before(function (done) {
 
 	// Run DB Setup
 	tasks.push(function (cb) {
-		let confFile;
+		let	confFile;
 
 		if (process.env.DBCONFFILE === undefined) {
 			confFile = __dirname + '/../config/db_test.json';
@@ -60,23 +60,18 @@ before(function (done) {
 	});
 
 	// Check for empty db
-	tasks.push(function (cb) {
-		db.query('SHOW TABLES', function (err, rows) {
-			if (err) throw err;
+	//Dont do this now since many libs creates stuff in the background before we get here
+	//tasks.push(function (cb) {
+	//	db.query('SHOW TABLES', function (err, rows) {
+	//		if (err) throw err;
 
-			if (rows.length) {
-				throw new Error('Database is not empty. To make a test, you must supply an empty database!');
-			}
+	//		if (rows.length) {
+	//			throw new Error('Database is not empty. To make a test, you must supply an empty database!');
+	//		}
 
-			cb();
-		});
-	});
-
-	// Setup intercom
-	tasks.push(function (cb) {
-		lUtils.instances.intercom = new Intercom('loopback interface');
-		lUtils.instances.intercom.on('ready', cb);
-	});
+	//		cb();
+	//	});
+	//});
 
 	tasks.push(function (cb) {
 		stockLib.dataWriter.ready(cb);
@@ -86,39 +81,36 @@ before(function (done) {
 });
 
 describe('Warehouses', function () {
-	let	warehouseOptions = {
-		uuid: uuidLib.v1(),
-		name: 'Cellar'
-	};
+	const	warehouseOptions = {};
+
+	warehouseOptions.uuid	= uuidLib.v1();
+	warehouseOptions.name	= 'Cellar';
 
 	it('should create a and save a warehouse', function (done) {
-		const	tasks	= [],
-			warehouse	= new stockLib.Warehouse(warehouseOptions);
+		const	warehouse	= new stockLib.Warehouse(warehouseOptions),
+			tasks	= [];
 
 		// Save warehouse
 		tasks.push(function (cb) {
-			warehouse.save(function (err) {
-				if (err) throw err;
-				cb(err);
-			});
+			warehouse.save(cb);
 		});
 
 		// Check the saved data.
 		tasks.push(function (cb) {
-			const warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
+
 			warehouse.loadFromDb(function (err) {
 				if (err) throw err;
 
-				assert.deepEqual(warehouseOptions.uuid, warehouse.uuid);
-				assert.deepEqual(warehouseOptions.name, warehouse.name);
-				assert.notDeepEqual(undefined, warehouse.created);
+				assert.strictEqual(warehouseOptions.uuid,	warehouse.uuid);
+				assert.strictEqual(warehouseOptions.name,	warehouse.name);
+				assert.notStrictEqual(undefined,	warehouse.created);
 				cb(err);
 			});
 		});
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
@@ -128,111 +120,81 @@ describe('Warehouses', function () {
 
 		// Remove warehouse
 		tasks.push(function (cb) {
-			const warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
 
-			warehouse.rm(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			warehouse.rm(cb);
 		});
 
 		tasks.push(function (cb) {
-			const warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions.uuid);
 
 			warehouse.loadFromDb(function (err) {
 				if (err) throw err;
 
-				assert.deepEqual(warehouseOptions.uuid, warehouse.uuid);
-				assert.deepEqual(undefined, warehouse.name);
-				assert.deepEqual(undefined, warehouse.created);
+				assert.strictEqual(warehouseOptions.uuid,	warehouse.uuid);
+				assert.strictEqual(undefined,	warehouse.name);
+				assert.strictEqual(undefined,	warehouse.created);
 				cb(err);
 			});
 		});
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
 
 	it('should create and get several warehouses', function (done) {
-		const	tasks	= [];
+		const	warehouseOptions1	= {},
+			warehouseOptions2	= {},
+			warehouseOptions3	= {},
+			tasks	= [];
 
-		let	warehouseOptions1,
-			warehouseOptions2,
-			warehouseOptions3;
-
-
-		warehouseOptions1 = {
-			uuid: uuidLib.v1(),
-			name: 'Cellar'
-		};
-
-		warehouseOptions2 = {
-			uuid: uuidLib.v1(),
-			name: 'Attic'
-		};
-
-		warehouseOptions3 = {
-			uuid: uuidLib.v1(),
-			name: 'Garage'
-		};
+		warehouseOptions1.uuid	= uuidLib.v1();
+		warehouseOptions1.name	= 'Cellar';
+		warehouseOptions2.uuid	= uuidLib.v1();
+		warehouseOptions2.name	= 'Attic';
+		warehouseOptions3.uuid	= uuidLib.v1();
+		warehouseOptions3.name	= 'Garage';
 
 		// Save warehouse1
 		tasks.push(function (cb) {
-			const warehouse = new stockLib.Warehouse(warehouseOptions1);
-
-			warehouse.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions1);
+			warehouse.save(cb);
 		});
 
 		// Save warehouse2
 		tasks.push(function (cb) {
-			const warehouse = new stockLib.Warehouse(warehouseOptions2);
-
-			warehouse.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions2);
+			warehouse.save(cb);
 		});
 
 		// Save warehouse3
 		tasks.push(function (cb) {
-			const warehouse = new stockLib.Warehouse(warehouseOptions3);
-
-			warehouse.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	warehouse	= new stockLib.Warehouse(warehouseOptions3);
+			warehouse.save(cb);
 		});
 
 		// Get all 3 warehouses
 		tasks.push(function (cb) {
-			const warehouses = new stockLib.Warehouses();
+			const	warehouses	= new stockLib.Warehouses();
 
 			warehouses.uuids	= [warehouseOptions1.uuid, warehouseOptions2.uuid, warehouseOptions3.uuid];
 
 			warehouses.get(function (err, result) {
 				if (err) throw err;
 
-				assert.deepEqual(result[warehouseOptions1.uuid].uuid,	warehouseOptions1.uuid);
-				assert.deepEqual(result[warehouseOptions1.uuid].name,	warehouseOptions1.name);
-				assert.notDeepEqual(result[warehouseOptions1.uuid].created,	undefined);
+				assert.strictEqual(result[warehouseOptions1.uuid].uuid,	warehouseOptions1.uuid);
+				assert.strictEqual(result[warehouseOptions1.uuid].name,	warehouseOptions1.name);
+				assert.notStrictEqual(result[warehouseOptions1.uuid].created,	undefined);
 
-				assert.deepEqual(result[warehouseOptions2.uuid].uuid,	warehouseOptions2.uuid);
-				assert.deepEqual(result[warehouseOptions2.uuid].name,	warehouseOptions2.name);
-				assert.notDeepEqual(result[warehouseOptions2.uuid].created,	undefined);
+				assert.strictEqual(result[warehouseOptions2.uuid].uuid,	warehouseOptions2.uuid);
+				assert.strictEqual(result[warehouseOptions2.uuid].name,	warehouseOptions2.name);
+				assert.notStrictEqual(result[warehouseOptions2.uuid].created,	undefined);
 
-				assert.deepEqual(result[warehouseOptions3.uuid].uuid,	warehouseOptions3.uuid);
-				assert.deepEqual(result[warehouseOptions3.uuid].name,	warehouseOptions3.name);
-				assert.notDeepEqual(result[warehouseOptions3.uuid].created,	undefined);
+				assert.strictEqual(result[warehouseOptions3.uuid].uuid,	warehouseOptions3.uuid);
+				assert.strictEqual(result[warehouseOptions3.uuid].name,	warehouseOptions3.name);
+				assert.notStrictEqual(result[warehouseOptions3.uuid].created,	undefined);
 
 				cb(err);
 			});
@@ -240,21 +202,21 @@ describe('Warehouses', function () {
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
 });
 
 describe('Slots', function () {
-	let	testWarehouse,
-		slotOptions = {
-			uuid: uuidLib.v1(),
-			name: 'A001'
-		};
+	const	slotOptions	= {};
+
+	let	testWarehouse;
+
+	slotOptions.uuid	= uuidLib.v1();
+	slotOptions.name	= 'A001';
 
 	before(function(done){
-		const warehouses = new stockLib.Warehouses();
+		const	warehouses	= new stockLib.Warehouses();
 
 		warehouses.get(function (err, result) {
 			if (err) throw err;
@@ -271,30 +233,25 @@ describe('Slots', function () {
 
 		// Save slot
 		tasks.push(function (cb) {
-			slot.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			slot.save(cb);
 		});
 
 		tasks.push(function (cb) {
-			const slot	= new stockLib.Slot(slotOptions.uuid);
+			const	slot	= new stockLib.Slot(slotOptions.uuid);
 
 			slot.loadFromDb(function (err) {
 				if (err) throw err;
 
-				assert.deepEqual(slotOptions.uuid, slot.uuid);
-				assert.deepEqual(slotOptions.name, slot.name);
-				assert.deepEqual(slotOptions.warehouseUuid, slot.warehouseUuid);
-				assert.notDeepEqual(slot.created, undefined);
+				assert.strictEqual(slotOptions.uuid,	slot.uuid);
+				assert.strictEqual(slotOptions.name,	slot.name);
+				assert.strictEqual(slotOptions.warehouseUuid,	slot.warehouseUuid);
+				assert.notStrictEqual(slot.created,	undefined);
 				cb(err);
 			});
 		});
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
@@ -304,118 +261,89 @@ describe('Slots', function () {
 
 		// Remove slot
 		tasks.push(function (cb) {
-			const slot	= new stockLib.Slot(slotOptions.uuid);
-
-			slot.rm(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	slot	= new stockLib.Slot(slotOptions.uuid);
+			slot.rm(cb);
 		});
 
 		tasks.push(function (cb) {
-			const slot	= new stockLib.Slot(slotOptions.uuid);
+			const	slot	= new stockLib.Slot(slotOptions.uuid);
 
 			slot.loadFromDb(function (err) {
 				if (err) throw err;
 
-				assert.deepEqual(slotOptions.uuid, slot.uuid);
-				assert.deepEqual(undefined, slot.name);
-				assert.deepEqual(undefined, slot.warehouseUuid);
-				assert.deepEqual(undefined, slot.created);
+				assert.strictEqual(slotOptions.uuid,	slot.uuid);
+				assert.strictEqual(undefined,	slot.name);
+				assert.strictEqual(undefined,	slot.warehouseUuid);
+				assert.strictEqual(undefined,	slot.created);
 				cb(err);
 			});
 		});
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
 
 	it('should create and get several slots', function (done) {
-		const	tasks	= [];
+		const	slotOptions1	= {},
+			slotOptions2	= {},
+			slotOptions3	= {},
+			tasks	= [];
 
-		let	slotOptions1,
-			slotOptions2,
-			slotOptions3;
+		slotOptions1.uuid	= uuidLib.v1();
+		slotOptions1.name	= 'A001';
+		slotOptions1.warehouseUuid	= testWarehouse.uuid;
 
+		slotOptions2.uuid	= uuidLib.v1();
+		slotOptions2.name	= 'A002';
+		slotOptions2.warehouseUuid	= testWarehouse.uuid;
 
-		slotOptions1 = {
-			uuid: uuidLib.v1(),
-			name: 'A001',
-			warehouseUuid: testWarehouse.uuid
-		};
-
-		slotOptions2 = {
-			uuid: uuidLib.v1(),
-			name: 'A002',
-			warehouseUuid: testWarehouse.uuid
-		};
-
-		slotOptions3 = {
-			uuid: uuidLib.v1(),
-			name: 'A003',
-			warehouseUuid: testWarehouse.uuid
-		};
+		slotOptions3.uuid	= uuidLib.v1();
+		slotOptions3.name	= 'A003';
+		slotOptions3.warehouseUuid	= testWarehouse.uuid;
 
 		// Save slot1
 		tasks.push(function (cb) {
-			const slot = new stockLib.Slot(slotOptions1);
-
-			slot.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	slot	= new stockLib.Slot(slotOptions1);
+			slot.save(cb);
 		});
 
 		// Save slot2
 		tasks.push(function (cb) {
-			const slot = new stockLib.Slot(slotOptions2);
-
-			slot.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	slot	= new stockLib.Slot(slotOptions2);
+			slot.save(cb);
 		});
 
 		// Save slot3
 		tasks.push(function (cb) {
-			const slot = new stockLib.Slot(slotOptions3);
-
-			slot.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			const	slot	= new stockLib.Slot(slotOptions3);
+			slot.save(cb);
 		});
 
 		// Get all 3 slots
 		tasks.push(function (cb) {
-			const slots = new stockLib.Slots();
+			const	slots	= new stockLib.Slots();
 
 			slots.uuids	= [slotOptions1.uuid, slotOptions2.uuid, slotOptions3.uuid];
 
 			slots.get(function (err, result) {
 				if (err) throw err;
 
-				assert.deepEqual(result[slotOptions1.uuid].uuid,	slotOptions1.uuid);
-				assert.deepEqual(result[slotOptions1.uuid].name,	slotOptions1.name);
-				assert.deepEqual(result[slotOptions1.uuid].warehouseUuid,	slotOptions1.warehouseUuid);
-				assert.notDeepEqual(result[slotOptions1.uuid].created,	undefined);
+				assert.strictEqual(result[slotOptions1.uuid].uuid,	slotOptions1.uuid);
+				assert.strictEqual(result[slotOptions1.uuid].name,	slotOptions1.name);
+				assert.strictEqual(result[slotOptions1.uuid].warehouseUuid,	slotOptions1.warehouseUuid);
+				assert.notStrictEqual(result[slotOptions1.uuid].created,	undefined);
 
-				assert.deepEqual(result[slotOptions2.uuid].uuid,	slotOptions2.uuid);
-				assert.deepEqual(result[slotOptions2.uuid].name,	slotOptions2.name);
-				assert.deepEqual(result[slotOptions2.uuid].warehouseUuid,	slotOptions2.warehouseUuid);
-				assert.notDeepEqual(result[slotOptions2.uuid].created,	undefined);
+				assert.strictEqual(result[slotOptions2.uuid].uuid,	slotOptions2.uuid);
+				assert.strictEqual(result[slotOptions2.uuid].name,	slotOptions2.name);
+				assert.strictEqual(result[slotOptions2.uuid].warehouseUuid,	slotOptions2.warehouseUuid);
+				assert.notStrictEqual(result[slotOptions2.uuid].created,	undefined);
 
-				assert.deepEqual(result[slotOptions3.uuid].uuid,	slotOptions3.uuid);
-				assert.deepEqual(result[slotOptions3.uuid].name,	slotOptions3.name);
-				assert.deepEqual(result[slotOptions3.uuid].warehouseUuid,	slotOptions3.warehouseUuid);
-				assert.notDeepEqual(result[slotOptions3.uuid].created,	undefined);
+				assert.strictEqual(result[slotOptions3.uuid].uuid,	slotOptions3.uuid);
+				assert.strictEqual(result[slotOptions3.uuid].name,	slotOptions3.name);
+				assert.strictEqual(result[slotOptions3.uuid].warehouseUuid,	slotOptions3.warehouseUuid);
+				assert.notStrictEqual(result[slotOptions3.uuid].created,	undefined);
 
 				cb(err);
 			});
@@ -423,21 +351,21 @@ describe('Slots', function () {
 
 		async.series(tasks, function(err) {
 			if (err) throw err;
-
 			done();
 		});
 	});
 });
 
 describe('Items', function () {
-	let	testSlot,
-		itemOptions = {
-			uuid: uuidLib.v1(),
-			article: '112121331-dsfsf',
-		};
+	const	itemOptions	= {};
+
+	let	testSlot;
+
+	itemOptions.uuid	= uuidLib.v1();
+	itemOptions.article	= '112121331-dsfsf';
 
 	before(function(done){
-		const slots = new stockLib.Slots();
+		const	slots	= new stockLib.Slots();
 
 		slots.get(function (err, result) {
 			if (err) throw err;
@@ -454,23 +382,19 @@ describe('Items', function () {
 
 		// Save item
 		tasks.push(function (cb) {
-			item.save(function (err) {
-				if (err) throw err;
-
-				cb(err);
-			});
+			item.save(cb);
 		});
 
 		tasks.push(function (cb) {
-			const item	= new stockLib.Item(itemOptions.uuid);
+			const	item	= new stockLib.Item(itemOptions.uuid);
 
 			item.loadFromDb(function (err) {
 				if (err) throw err;
 
-				assert.deepEqual(itemOptions.uuid, item.uuid);
-				assert.deepEqual(itemOptions.article, item.article);
-				assert.deepEqual(itemOptions.slotUuid, item.slotUuid);
-				assert.notDeepEqual(item.created, undefined);
+				assert.strictEqual(itemOptions.uuid, item.uuid);
+				assert.strictEqual(itemOptions.article, item.article);
+				assert.strictEqual(itemOptions.slotUuid, item.slotUuid);
+				assert.notStrictEqual(item.created, undefined);
 				cb(err);
 			});
 		});

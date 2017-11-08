@@ -11,8 +11,7 @@ const	EventEmitter	= require('events').EventEmitter,
 	db	= require('larvitdb');
 
 let	readyInProgress	= false,
-	isReady	= false,
-	intercom;
+	isReady	= false;
 
 function ready(cb) {
 	const	tasks	= [];
@@ -28,12 +27,6 @@ function ready(cb) {
 
 	tasks.push(function (cb) {
 		dataWriter.ready(cb);
-	});
-
-	// Load intercom. This must be done after the datawriter is ready
-	tasks.push(function (cb) {
-		intercom	= require('larvitutils').instances.intercom;
-		cb();
 	});
 
 	async.series(tasks, function () {
@@ -125,7 +118,7 @@ Warehouse.prototype.save = function (cb) {
 		message.params.name	= that.name;
 		message.params.created	= that.created;
 
-		intercom.send(message, options, function (err, msgUuid) {
+		dataWriter.intercom.send(message, options, function (err, msgUuid) {
 			if (err) return cb(err);
 
 			dataWriter.emitter.once(msgUuid, cb);
@@ -148,7 +141,7 @@ Warehouse.prototype.rm = function (cb) {
 	message.params	= {};
 	message.params.uuid	= that.uuid;
 
-	intercom.send(message, options, function (err, msgUuid) {
+	dataWriter.intercom.send(message, options, function (err, msgUuid) {
 		if (err) return cb(err);
 
 		dataWriter.emitter.once(msgUuid, cb);
